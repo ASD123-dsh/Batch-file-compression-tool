@@ -168,7 +168,7 @@ const API_ENDPOINTS = {
 };
 
 const CONSTANTS = {
-    MAX_BATCH_FILES: 100,
+    MAX_BATCH_FILES: 10000,
     MAX_FILE_SIZE: 2 * 1024 * 1024 * 1024,  // 2GB
     DELETE_DELAY: 5000,  // 5秒后通知删除
     FILE_SIZE_UNITS: ['Bytes', 'KB', 'MB', 'GB']
@@ -476,10 +476,60 @@ class CompressorApp {
             uploadArea.classList.remove('dragover');
         });
 
-        uploadArea.addEventListener('drop', (e) => {
+        uploadArea.addEventListener('drop', async (e) => {
             e.preventDefault();
             uploadArea.classList.remove('dragover');
-            if (e.dataTransfer.files.length > 0) {
+            
+            const items = e.dataTransfer.items;
+            if (items && items.length > 0) {
+                const files = [];
+                const queue = [];
+                
+                // 获取所有条目
+                for (let i = 0; i < items.length; i++) {
+                    const item = items[i].webkitGetAsEntry ? items[i].webkitGetAsEntry() : items[i].getAsEntry();
+                    if (item) {
+                        queue.push(item);
+                    }
+                }
+                
+                // 递归处理目录
+                while (queue.length > 0) {
+                    const entry = queue.shift();
+                    if (entry.isFile) {
+                        try {
+                            const file = await new Promise((resolve, reject) => {
+                                entry.file(resolve, reject);
+                            });
+                            files.push(file);
+                        } catch (err) {
+                            console.warn('读取文件失败:', entry.name, err);
+                        }
+                    } else if (entry.isDirectory) {
+                        try {
+                            const reader = entry.createReader();
+                            // 读取目录中的所有条目（可能需要多次读取）
+                            const readEntries = async () => {
+                                const entries = await new Promise((resolve, reject) => {
+                                    reader.readEntries(resolve, reject);
+                                });
+                                if (entries.length > 0) {
+                                    entries.forEach(e => queue.push(e));
+                                    await readEntries(); // 继续读取
+                                }
+                            };
+                            await readEntries();
+                        } catch (err) {
+                            console.warn('读取目录失败:', entry.name, err);
+                        }
+                    }
+                }
+                
+                if (files.length > 0) {
+                    this.handleBatchFiles(files);
+                }
+            } else if (e.dataTransfer.files.length > 0) {
+                // 回退到普通文件处理
                 this.handleBatchFiles(Array.from(e.dataTransfer.files));
             }
         });
