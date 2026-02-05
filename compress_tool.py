@@ -184,6 +184,19 @@ class FileCompressorApp:
         
         # 创建主窗口
         self._create_main_window()
+
+        self.video_preset_display_map = {
+            'ultrafast': '极速',
+            'superfast': '超快',
+            'veryfast': '非常快',
+            'faster': '更快',
+            'fast': '快',
+            'medium': '中等',
+            'slow': '慢',
+            'slower': '更慢',
+            'veryslow': '极慢'
+        }
+        self.video_preset_value_map = {v: k for k, v in self.video_preset_display_map.items()}
         
         # UI变量
         self.source_dir = tk.StringVar(value=self.config_manager.get('source_dir', ''))
@@ -598,6 +611,19 @@ class FileCompressorApp:
         self.photo_quality_entry.insert(0, str(self.config_manager.get('photo_quality', 85)))
         self.photo_quality_entry.pack(side=tk.LEFT, padx=4)
         ttk.Label(row1, text="(0-100)", font=('Segoe UI', 8), foreground='gray').pack(side=tk.LEFT)
+
+        ttk.Label(row1, text="图片模式:", font=('Segoe UI', 9)).pack(side=tk.LEFT, padx=(12, 6))
+        self.image_preset_combo = ttk.Combobox(
+            row1,
+            values=["自定义", "压缩优先", "清晰优先"],
+            width=10,
+            font=('Segoe UI', 9),
+            state="readonly"
+        )
+        self.image_preset_combo.set(self.config_manager.get('image_preset', '自定义'))
+        self.image_preset_combo.pack(side=tk.LEFT, padx=4)
+        self.image_preset_combo.bind("<<ComboboxSelected>>", self._on_image_preset_changed)
+        self._update_photo_quality_entry_state()
         
         ttk.Label(row1, text="分辨率预设:", font=('Segoe UI', 9)).pack(side=tk.LEFT, padx=(12, 6))
         self.resolution_preset_combo = ttk.Combobox(
@@ -640,12 +666,12 @@ class FileCompressorApp:
         ttk.Label(row2_video, text="预设:", font=('Segoe UI', 9)).pack(side=tk.LEFT, padx=(12, 6))
         self.video_preset_combo = ttk.Combobox(
             row2_video, 
-            values=["ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow"],
+            values=list(self.video_preset_value_map.keys()),
             width=12,
             font=('Segoe UI', 9),
             state="readonly"
         )
-        self.video_preset_combo.set(self.config_manager.get('video_preset', 'medium'))
+        self.video_preset_combo.set(self._video_preset_to_display(self.config_manager.get('video_preset', 'medium')))
         self.video_preset_combo.pack(side=tk.LEFT, padx=4)
         
         # 第三行：编码模式和GPU设置
@@ -706,6 +732,21 @@ class FileCompressorApp:
         
         # 更新自定义输入框的显示状态
         self._update_resolution_custom_display()
+
+    def _on_image_preset_changed(self, event=None):
+        """图片预设模式改变时的处理（仅更新界面，不保存配置）"""
+        self._update_photo_quality_entry_state()
+
+    def _update_photo_quality_entry_state(self):
+        """根据图片预设模式更新照片质量输入框可编辑状态"""
+        if not hasattr(self, 'image_preset_combo') or not hasattr(self, 'photo_quality_entry'):
+            return
+        
+        preset = self.image_preset_combo.get()
+        if preset == '自定义':
+            self.photo_quality_entry.config(state=tk.NORMAL)
+        else:
+            self.photo_quality_entry.config(state=tk.DISABLED)
     
     def _update_resolution_custom_display(self):
         """更新分辨率自定义输入框的显示状态"""
@@ -1268,11 +1309,12 @@ class FileCompressorApp:
                 raise ValueError("视频CRF必须在18-28之间")
             
             self.config_manager.set('photo_quality', photo_quality)
+            self.config_manager.set('image_preset', self.image_preset_combo.get() if hasattr(self, 'image_preset_combo') else '自定义')
             self.config_manager.set('resolution_preset', resolution_preset)
             self.config_manager.set('max_photo_width', max_photo_width)
             self.config_manager.set('max_photo_height', max_photo_height)
             self.config_manager.set('video_crf', video_crf)
-            self.config_manager.set('video_preset', self.video_preset_combo.get())
+            self.config_manager.set('video_preset', self._video_preset_to_value(self.video_preset_combo.get()))
             
             mode = self.encode_mode_combo.get()
             if mode == "CPU":
@@ -1305,6 +1347,14 @@ class FileCompressorApp:
             messagebox.showerror("错误", f"请输入有效的数值: {str(e)}")
         except Exception as e:
             messagebox.showerror("错误", f"保存设置时出错: {str(e)}")
+
+    def _video_preset_to_display(self, preset_value):
+        """将配置中的视频预设值转换为界面显示文本"""
+        return self.video_preset_display_map.get(preset_value, self.video_preset_display_map.get('medium', '中等'))
+
+    def _video_preset_to_value(self, preset_display):
+        """将界面显示文本转换为配置中的视频预设值"""
+        return self.video_preset_value_map.get(preset_display, 'medium')
     
     def start_compression(self):
         """开始压缩"""
@@ -1395,6 +1445,7 @@ class FileCompressorApp:
         
         self.logger.info(f"开始压缩 - 源: {source}, 目标: {target}")
         self.logger.info(f"压缩参数 - 照片质量: {self.config_manager.get('photo_quality')}, "
+                        f"图片模式: {self.config_manager.get('image_preset')}, "
                         f"视频CRF: {self.config_manager.get('video_crf')}, "
                         f"GPU模式: {self.config_manager.get('use_gpu')}")
         
@@ -3221,7 +3272,7 @@ class FileCompressorApp:
 压缩设置:
   照片质量: {config.get('photo_quality', 85)}
   视频CRF: {config.get('video_crf', 23)}
-  视频预设: {config.get('video_preset', 'medium')}
+  视频预设: {self._video_preset_to_display(config.get('video_preset', 'medium'))}
   编码模式: {config.get('use_gpu', 'cpu').upper()}
 """
         
@@ -3352,7 +3403,7 @@ class FileCompressorApp:
 压缩设置：
   照片质量: {self.config_manager.get('photo_quality', 85)}
   视频CRF: {self.config_manager.get('video_crf', 23)}
-  视频预设: {self.config_manager.get('video_preset', 'medium')}
+  视频预设: {self._video_preset_to_display(self.config_manager.get('video_preset', 'medium'))}
   编码模式: {self.config_manager.get('use_gpu', 'cpu').upper()}
 """
             
@@ -3600,7 +3651,7 @@ class FileCompressorApp:
 2️⃣ 设置压缩参数
    • 📷 照片质量：0-100（推荐85）
    • 🎬 视频CRF：18-28（18质量最好，28压缩率最高）
-   • 预设：ultrafast（最快）到 veryslow（最慢）
+  • 预设：极速（最快）到 极慢（最慢）
    • 💻 编码模式：CPU / AMD GPU / Nvidia GPU
 
 3️⃣ 选择文件（可选）
@@ -3747,7 +3798,7 @@ Ctrl+Q    - 退出程序
    • 支持MP4, AVI, MOV, MKV, WMV, FLV等主流格式
    • H.264/HEVC编码
    • 可调节CRF值（18-28）
-   • 多种编码预设（ultrafast到veryslow）
+   • 多种编码预设（极速到极慢）
 
 ⚡ 硬件加速
    • AMD GPU加速（AMF编码器）

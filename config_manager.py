@@ -37,6 +37,7 @@ class ConfigManager:
         self.defaults = {
             'ffmpeg_path': 'bin\\ffmpeg.exe',
             'photo_quality': 85,
+            'image_preset': '自定义',
             'video_crf': 23,
             'video_preset': 'medium',
             'max_photo_width': 2000,
@@ -130,6 +131,8 @@ class ConfigManager:
         # 基本配置
         self.settings['photo_quality'] = self.config.getint('General', 'photo_quality', 
                                                            fallback=self.defaults['photo_quality'])
+        self.settings['image_preset'] = self.config.get('General', 'image_preset',
+                                                       fallback=self.defaults['image_preset'])
         self.settings['video_crf'] = self.config.getint('General', 'video_crf', 
                                                        fallback=self.defaults['video_crf'])
         self.settings['video_preset'] = self.config.get('General', 'video_preset', 
@@ -195,6 +198,7 @@ class ConfigManager:
         self.config.set('General', 'ffmpeg_path', 
                        self.config.get('General', 'ffmpeg_path', fallback=self.defaults['ffmpeg_path']))
         self.config.set('General', 'photo_quality', str(self.settings.get('photo_quality', self.defaults['photo_quality'])))
+        self.config.set('General', 'image_preset', self.settings.get('image_preset', self.defaults['image_preset']))
         self.config.set('General', 'video_crf', str(self.settings.get('video_crf', self.defaults['video_crf'])))
         self.config.set('General', 'video_preset', self.settings.get('video_preset', self.defaults['video_preset']))
         self.config.set('General', 'max_photo_width', str(self.settings.get('max_photo_width', self.defaults['max_photo_width'])))
@@ -259,6 +263,12 @@ class ConfigManager:
         if not (0 <= photo_quality <= 100):
             errors.append(f"照片质量 ({photo_quality}) 超出有效范围 (0-100)")
             self.settings['photo_quality'] = self.defaults['photo_quality']
+
+        image_preset = self.settings.get('image_preset', self.defaults['image_preset'])
+        valid_image_presets = ['自定义', '压缩优先', '清晰优先']
+        if image_preset not in valid_image_presets:
+            errors.append(f"图片预设模式 ({image_preset}) 无效")
+            self.settings['image_preset'] = self.defaults['image_preset']
         
         # 验证视频CRF
         video_crf = self.settings.get('video_crf', self.defaults['video_crf'])

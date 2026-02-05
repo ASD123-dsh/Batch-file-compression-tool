@@ -143,6 +143,7 @@ class FileProcessor:
                     pixel_ratio = 1.0
                 
                 photo_quality = config.get('photo_quality', 85)
+                image_preset = config.get('image_preset', '自定义')
                 
                 # 根据格式和质量估算压缩率
                 if file_ext.lower() in ['.jpg', '.jpeg']:
@@ -158,12 +159,17 @@ class FileProcessor:
                     quality_adjustment = (85 - photo_quality) * 0.003
                     compression_ratio = max(0.2, min(0.8, base_ratio + quality_adjustment))
                 elif file_ext.lower() == '.png':
-                    if photo_quality >= 85:
-                        compression_ratio = 0.35
-                    elif photo_quality >= 75:
-                        compression_ratio = 0.30
+                    if image_preset == '清晰优先':
+                        compression_ratio = 0.92
+                    elif image_preset == '压缩优先':
+                        compression_ratio = 0.65 if photo_quality >= 70 else 0.45
                     else:
-                        compression_ratio = 0.25
+                        if photo_quality >= 90:
+                            compression_ratio = 0.92
+                        elif photo_quality >= 70:
+                            compression_ratio = 0.85
+                        else:
+                            compression_ratio = 0.60
                 else:
                     compression_ratio = 0.40
                 

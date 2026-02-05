@@ -180,7 +180,7 @@ class WebServer:
                         settings = json.loads(request.form.get('settings'))
                         # 应用设置（不包含GPU配置）
                         allowed_keys = {
-                            'photo_quality', 'video_crf', 'video_preset',
+                            'photo_quality', 'image_preset', 'video_crf', 'video_preset',
                             'max_photo_width', 'max_photo_height', 'resolution_preset'
                         }
                         for key, value in settings.items():
@@ -1318,4 +1318,3 @@ class WebServer:
                             pass
         except Exception as e:
             self.logger.error(f"删除任务文件失败: {task_id}, 错误: {e}")
-
